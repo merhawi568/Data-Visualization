@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <script src="http://d3js.org/d3.v3.min.js"></script>
+  <style>
+    path { 
+      stroke: steelblue;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: grey;
+      stroke-width: 1;
+      shape-rendering: crispEdges;
+    }
+    .x_axis path,
+    .x_axis line {
+      fill: none;
+      stroke: blue;
+      stroke-width: 4;
+      shape-rendering: crispEdges;
+    }
+
+    body {
+      background-color: black;
+   
+    } 
+
+    div.tooltip { 
+      position: absolute;     
+      text-align: center;     
+      width: 60px;          
+      height: 38px;         
+      padding: 2px;       
+      font: 12px sans-serif;    
+      background: lightblue; 
+      border: 0px;    
+      border-radius: 8px;     
+      pointer-events: none;     
+    }
+
+    div.tooltip_info { 
+      position: absolute;     
+      text-align: left;     
+      width: 400px;          
+      height: 300px;         
+      padding: 2px;       
+      font: 14px sans-serif;    
+      background: pink; 
+      border: 0px;    
+      border-radius: 8px;     
+      pointer-events: none;     
+    }
+    div.years_buttons {
+        position: absolute;
+        top: 200px;
+        left: 50px;
+        
+      }
+    div.years_buttons div {
+        background-color: orange;
+        text-align: center;  
+        padding: 3px;
+        margin: 7px;
+        width: 55px;          
+        height: 35px; 
+        font: 12px;
+        border: 0px;    
+        border-radius: 8px;      
+    }   
+    div.Source_button {      
+        position: absolute;
+        top: 1500px;
+        left: 1600px; 
+        text-align: center;     
+        width: 80px;          
+        height: 25px;       
+        padding: 2px; 
+        margin: 50px;      
+        font: 20px sans-serif;    
+        background-color: gray;
+        border: 0px;    
+        border-radius: 8px;     
+    }
+    div.info_button {      
+        position: absolute;
+        top: 10px;
+        left: 1600px; 
+        text-align: center;     
+        width: 60px;          
+        height: 25px;       
+        padding: 2px; 
+        margin: 50px;      
+        font: 20px sans-serif;    
+        background-color: gray;
+        border: 0px;    
+        border-radius: 8px;
+    }  
+    div.legend_1 {
+        position: absolute;
+         top: 845px;
+        left: 330px;
+        
+    }
+    div.legend_2 {
+        position: absolute;
+        top: 820px;
+        left: 330px;
+    }
+    div.legend_3 {
+      position: absolute;
+      top: 720px;
+      left: 330px;
+    }
+
+    div.legend_4 {
+      position: absolute;
+      top: 530px;
+      left: 330px;
+    }
+
+  </style>
+  <script type="text/javascript">  
+
+    function draw(geo_data) {
+      "use strict";
+      var margin = 50,
+        width = 1800 - margin,
+        height = 800 - margin;
+        // set the title 
+      d3.select("body")
+        .append("h2")
+        .text('Eritrean Refuguee Exodus')
+        .style("color","lightBlue")
+        .style("text-align","center")
+        .style('font',"sans-serif");
+         // set the svg canvas
+      var svg = d3.select("body")
+                  .append("svg")
+                  .attr("width", width + margin)
+                  .attr("height", height + margin)
+                  .append('g')
+                  .attr('class', 'map');
+        // the years under consideration
+      var years = [];
+        for(var i = 2000; i < 2015; i += 1) {
+             years.push(i);
+        }
+       // insert map of the world
+      var projection = d3.geo.mercator()
+                         .scale(260)
+                         .translate([width / 2, height / 1.5]);
+      var path = d3.geo.path().projection(projection);
+      var map = svg.selectAll('path')
+                   .data(geo_data.features)
+                   .enter()
+                   .append('path')
+                   .attr('d', path)
+                   .style('stroke', 'black')
+                   .style('stroke-width', 0.5)
+                   .style("fill", function(d) { 
+                        if (d.properties.name == "Eritrea") {return 'red'}
+                        else {return 'white'};
+                   })
+        // filtering and nesting the data
+      function plot_points(data) {
+        data=data.filter(function (d) { return d['Origin'] === 'Eritrea'});
+        data=data.filter(function (d) { return d['Applied during year'] !== 0});
+        var range_applicants_Yearly = d3.extent(data, function(d) {
+            return d['Applied during year'];
+        });          
+      // nesting the data to be used along with the map
+        var nested = d3.nest()
+                       .key(function(d) {
+                          return d['Year'];
+                        })
+                       .key(function(d){
+                        return d['Country / territory of asylum/residence'];
+                       })
+                      .rollup( function(leaves) {
+                        var total= d3.sum(leaves,function(d){
+                          return d['Applied during year']
+                        });
+                        var Asylum_territory = d3.set();
+                        leaves.forEach(function(d) {
+                          Asylum_territory.add(d['Country / territory of asylum/residence'])
+                        });
+                        var Calander = d3.set();
+                        leaves.forEach(function(d) {
+                          Calander.add(d['Year'])
+                        });
+                        var Coord_x = d3.set();
+                        leaves.forEach(function(d) {
+                          Coord_x.add(leaves.map(function(d) {
+                            return projection([+d.Longitude,+d.Latitude])[0];
+                            }))
+                        });                 
+                        var Coord_y = d3.set();
+                        leaves.forEach(function(d) {
+                          Coord_y.add(leaves.map(function(d) {
+                            return projection([+d.Longitude,+d.Latitude])[1];
+                          }))
+                        });
+
+                        var Asylum_seekers= d3.set();
+                        leaves.forEach(function(d) {
+                          Asylum_seekers.add(d['Applied during year'])
+                        });        
+                        return { 
+                          total: total,                                           
+                          Asylum_territory: Asylum_territory.values(), 
+                          x: +Coord_x.values()[0].split(",")[0],
+                          y:+Coord_y.values()[0].split(",")[0],
+                          Asylum_seekers:Asylum_seekers.values(),
+                          Calander: +Calander.values()                                        
+                               };
+                      }).entries(data)
+        // scale to convert the number of asylum seekers to pixel values
+        var radius = d3.scale.sqrt()
+                       .domain([range_applicants_Yearly[0], range_applicants_Yearly[1]])
+                       .range([1, 20]);
+        // scale to represent the number of asylum seekers by color gradient
+        var color_gradient = d3.scale.linear()
+                               .domain([1,range_applicants_Yearly[1]/50,range_applicants_Yearly[1]/10,range_applicants_Yearly[1]*2/5,range_applicants_Yearly[1]])
+                               .range(["#ffffcc","#c2e699","#78c679","#31a354","#006837"]);
+        function key_func(d) {return d.key };                     
+        // legend for the plot
+        function legends(){
+          //rectangles with the right colors are used to describe the legend 
+          function float2int (value) {
+                  return value | 0;
+          }
+          var legends=svg.selectAll('g') 
+                         .append("rect")
+                         .attr("height",(color_gradient.domain()[1]- color_gradient.domain()[0])/100)
+                         .attr("x", margin+250 )
+                         .attr('y', height+15)
+                         .attr("width", 20)
+                         .style("fill", color_gradient.range()[1]);              
+          var buttons_legend=d3.select('body')
+                               .append('div')
+                               .attr('class','legend_1')
+                               .text(float2int(color_gradient.domain()[1]))
+                               .style("color",'white')
+                               .style("font-weight", "bold")
+                               .style('background','BLACK');
+          var legends=svg.selectAll('g')               
+                         .append("rect")
+                         .attr("height",(color_gradient.domain()[2]- color_gradient.domain()[1])/100)
+                         .attr("x", margin+250 )
+                         .attr('y', height+15- (color_gradient.domain()[2]- color_gradient.domain()[1])/100)
+                         .attr("width", 20)
+                         .style("fill", color_gradient.range()[2]);
+          var buttons_legend=d3.select('body')
+                               .append('div')
+                               .attr('class','legend_2')
+                               .text(color_gradient.domain()[2])
+                               .style("color",'white')
+                               .style("font-weight", "bold")
+                               .style('background','BLACK');
+          var legends=svg.selectAll('g')                
+                         .append("rect")
+                         .attr("height",(color_gradient.domain()[3]- color_gradient.domain()[2])/100)
+                         .attr("x", margin+250 )
+                         .attr('y', height+15- (color_gradient.domain()[3]- color_gradient.domain()[1])/100)
+                         .attr("width", 20)
+                         .style("fill", color_gradient.range()[3]);
+          var buttons_legend=d3.select('body')
+                               .append('div')
+                               .attr('class','legend_3')
+                               .text(color_gradient.domain()[3])
+                               .style("color",'white')
+                               .style("font-weight", "bold")
+                               .style('background','BLACK');
+          var legends=svg.selectAll('g')                
+                         .append("rect")
+                         .attr("height",(color_gradient.domain()[4]- color_gradient.domain()[3])/100)
+                         .attr("x", margin+250 )
+                         .attr('y', height+15- (color_gradient.domain()[4]- color_gradient.domain()[1])/100)
+                         .attr("width", 20)
+                         .style("fill", color_gradient.range()[4]);
+          var buttons_legend=d3.select('body')
+                               .append('div')
+                               .attr('class','legend_4')
+                               .text(color_gradient.domain()[4])
+                               .style("color",'white')
+                               .style("font-weight", "bold")
+                               .style('background','BLACK');
+        }
+            //draws the circles to repesent each year's asylum seekers
+        function draw_circle(year) {              
+          var filtered=nested.filter(function (d) { 
+            return +d['key'] === year 
+          });             
+          svg.selectAll('circle')
+             .attr('opacity', 0)    // hides all the previous year circles                
+             d3.select("h2")
+             .html('Eritrean Refuguee Exodus '+ "<br/>"+ year); // updates the title
+          // select the year, 1st layer of the nested data
+          var sel=svg.selectAll('g')
+                     .data(filtered,key_func)
+                     .enter()
+                     .append("g")                     
+          var countries=[]
+          var refugee_per_country=[]
+          for(var i = 0; i < filtered[0].values.length; i += 1) {
+            countries.push(filtered[0].values[i].values['Asylum_territory'])
+            refugee_per_country.push(filtered[0].values[i].values['total']);
+          }
+          for(var i=0;i< countries.length;i +=1) {
+            if (countries[i]=='United States')
+              {
+                countries[i]='USA';
+              }
+            if (countries[i]=='Hong kong')
+              {
+                countries[i]='China';
+              }
+           if (countries[i]=='United Kingdom')
+              {
+                countries[i]='England';
+              }
+            if (countries[i]=='Congo [Republic]')
+              {
+                countries[i]='Democratic Republic of the Congo';
+              }
+          }                  
+          svg.selectAll('path')
+             .style('fill', function(d){
+               for(var i=0;i< countries.length;i +=1){
+                 if (d.properties.name==countries[i]){
+                   return color_gradient(refugee_per_country[i]);
+                 }
+               }
+               if (d.properties.name == "Eritrea") {
+                 return 'red';
+               }
+               else {
+                 return 'white';
+               }              
+             })
+             .on("mouseover", function(d) {    // tooltips 
+               for(var i=0;i< countries.length;i +=1){
+                 if (d.properties.name==countries[i]){                
+                  div.transition()    
+                     .duration(200)    
+                     .style("opacity", .9)                 
+                  div.html( countries[i] + "<br/>"  + refugee_per_country[i]) 
+                     .style("left", (d3.event.pageX) + "px")   
+                     .style("top", (d3.event.pageY - 28) + "px");  
+                 } 
+               }
+              })           
+              .on("mouseout", function(d) {   
+                div.transition()    
+                   .duration(500)    
+                   .style("opacity", 0); 
+              })
+          legends() // add the legends
+                   
+        };
+        // Update the circles based on year of choice    
+        function update(year_tooltips){
+          var filtered=nested.filter(function (d) { 
+            return +d['key'] === year_tooltips
+          });                      
+          svg.selectAll('circle').data(filtered).exit().remove()
+          d3.select("h2")
+            .html('Eritrean Refuguee Exodus '+ "<br/>"+ year_tooltips) // update the title with the year selected             
+          var countries=[]
+          var refugee_per_country=[]
+          for(var i = 0; i < filtered[0].values.length; i += 1) {
+            countries.push(filtered[0].values[i].values['Asylum_territory'])
+            refugee_per_country.push(filtered[0].values[i].values['total']);
+          }
+          for(var i=0;i< countries.length;i +=1) {
+            if (countries[i]=='United States'){
+              countries[i]='USA';
+            }
+            if (countries[i]=='Hong kong'){
+              countries[i]='China';
+            }
+           if (countries[i]=='United Kingdom'){
+              countries[i]='England';
+            }
+            if (countries[i]=='Congo [Republic]'){
+              countries[i]='Democratic Republic of the Congo';
+            }           
+          }  
+          svg.selectAll('path')
+             .style('fill', function(d){
+               for(var i=0;i< countries.length;i +=1){
+                 if (d.properties.name==countries[i]){
+                   return color_gradient(refugee_per_country[i]);
+                 }
+               }
+               if (d.properties.name == "Eritrea") {
+                 return 'red';
+               }
+               else {
+                 return 'white';
+               }              
+            })
+            .on("mouseover", function(d) {    // tooltips 
+              for(var i=0;i< countries.length;i +=1){
+                if (d.properties.name==countries[i]){
+                  div.transition()    
+                     .duration(200)    
+                     .style("opacity", .9)                
+                  div .html( countries[i] + "<br/>"  + refugee_per_country[i]) 
+                      .style("left", (d3.event.pageX) + "px")   
+                      .style("top", (d3.event.pageY - 28) + "px");  
+                } 
+              }
+            })         
+               
+            .on("mouseout", function(d) {   
+              div.transition()    
+                 .duration(500)    
+                 .style("opacity", 0); 
+            })          
+          legends() // add the legends
+        };
+        // nesting the data for showing the total no of refugges 2000-2014
+        var nested_total= d3.nest()
+                            .key(function(d) {
+                              return d['Country / territory of asylum/residence'];
+                            })                           
+                            .rollup( function(leaves) {
+                              var total_per_country= d3.sum(leaves,function(d){
+                                return d['Applied during year']
+                              });                            
+                              var territory= d3.set();
+                              leaves.forEach(function(d) {
+                                territory.add(d['Country / territory of asylum/residence'])
+                              });
+                              var Coord_x_line = d3.set();
+                                leaves.forEach(function(d) {
+                                  Coord_x_line.add(leaves.map(function(d) {
+                                    return projection([+d.Longitude,+d.Latitude])[0];
+                                  }))
+                                });                    
+                              var Coord_y_line = d3.set();
+                              leaves.forEach(function(d) {
+                                Coord_y_line.add(leaves.map(function(d) {
+                                  return projection([+d.Longitude,+d.Latitude])[1];
+                                }))
+                              });
+                              return {
+                                total_per_country,
+                                Coord_x_line :+Coord_x_line.values()[0].split(",")[0],
+                                Coord_y_line: +Coord_y_line.values()[0].split(",")[0],
+                                territory: territory.values()
+                              }; 
+                            }).entries(data)               
+        // nesting the data for showing the trend per country over the years i.e. scattter plot
+        var nested_trend = d3.nest()
+                             .key(function(d) {
+                               return d['Country / territory of asylum/residence'];
+                             })
+                             .key(function(d){
+                              return d['Year'];
+                             })
+                             .rollup( function(leaves) {
+                               var total= d3.sum(leaves,function(d){
+                                return d['Applied during year']
+                               });                           
+                               var Asylum_territory = d3.set();
+                               leaves.forEach(function(d) {
+                                 Asylum_territory.add(d['Country / territory of asylum/residence'])
+                               });
+                               var Calander = d3.set();
+                               var format = d3.time.format("%Y");
+                               leaves.forEach(function(d) {
+                                Calander.add((d['Year_formated']))
+                               });                 
+                               var Asylum_seekers= d3.set();
+                               leaves.forEach(function(d) {
+                                 Asylum_seekers.add(d['Applied during year'])
+                               });       
+                               return  { 
+                                total: total,                      
+                                Asylum_territory: Asylum_territory.values(),                                         
+                                Asylum_seekers:Asylum_seekers.values(),
+                                Calander: Calander.values()                                        
+                               };
+                             }).entries(data)
+        //function  to show trend per country
+        function trend_chart(){
+          var countries_list=d3.set();
+                             data.forEach(function(d) {
+                                countries_list.add(d['Country / territory of asylum/residence'])
+                              });
+          var filtered=nested_trend.filter(function (d) { 
+            return d['key'] === 'Australia'
+          }); // default selection of the dropdown menu
+          var margin = {top: 30, right: 20, bottom: 30, left: 100},
+              width = 1000 - margin.left - margin.right,
+              height = 600 - margin.top - margin.bottom;
+          d3.select("body")
+            .append("h3")
+            .text('Trend by Country')
+            .style("color","lightBlue")
+            .style("text-align","center")
+            .style('font',"sans-serif");
+                      // Set the ranges
+          var xx = d3.time.scale().range([0, width]);
+          var yy = d3.scale.linear().range([height, 0]);  
+          // Define the axes
+          var xAxis = d3.svg.axis().scale(xx)
+                            .orient("bottom").ticks(d3.time.year,4) ;                       
+          var yAxis = d3.svg.axis().scale(yy)
+                        .orient("left")
+                        .ticks(10);
+          // Adds the svg canvas
+          var svg = d3.select("body")
+                      .append("svg")
+                      .attr("width", width + margin.left + margin.right)
+                      .attr("height", height + margin.top + margin.bottom)
+                      .append("g")
+                      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+          // drop down menu                      
+          svg.append("foreignObject")
+             .attr({
+                "height": 50,
+                "width": 300,
+                "transform": "translate(" + margin.left+ "," + margin.top + ")"
+             })
+             .append("xhtml:select")
+             .attr("id", "drop-down")
+             .selectAll("option")
+             .data(countries_list.values())
+             .enter()
+             .append("option")                          
+             .text(function(d) {
+                return d;
+              })
+             .attr("value", function(d){ 
+                return d; 
+              });
+          d3.select("#drop-down").on("change", function () { 
+            var selected = this.value;
+            console.log(selected);
+            update_trend_chart(selected);
+          }); 
+          var tooltip_chart = d3.select("body").append("div")
+                                .attr("class", "tooltip")
+                                .style("opacity", 0);              
+          var format = d3.time.format("%Y");
+          yy.domain(range_applicants_Yearly);
+          xx.domain([format.parse('2000'),format.parse('2014')]);               
+          var tooltips_dashed_y = svg.append("g")  // dashed lines along with tooltips                   
+                                     .append("line");
+          var tooltips_dashed_x = svg.append("g")                   
+                                    .append("line"); 
+          // draw the scatter plot using circles
+          var sel3=svg.selectAll('g')  // selects the country again the data here is double nested
+                      .data(filtered)
+                      .enter()
+                      .append("g")
+          var sel4=sel3.selectAll('g')  // slects the values for each year
+                       .data(function(d){return d.values})
+                       .enter()
+                       .append('circle').attr('class','dot')
+                       .attr('r', 5)
+                       .attr('cx', function(d) { 
+                         return xx(format.parse(d3.format('')((+d.values['Calander']))))
+                       })
+                       .attr('cy', function(d) { 
+                          return yy(d.values['total'] )
+                        })
+                       .attr( 'stroke', 'lightblue')
+                       .attr('stroke-width','2')
+                       .on("mouseover", function(d) {
+                          tooltip_chart.transition()
+                          .duration(200)
+                          .style("opacity", 0.9);
+                          tooltip_chart.html( d.values['Calander']  + ", " + "<br/> "+ d.values['total'] )
+                            .style("left", (d3.event.pageX + 5) + "px")
+                            .style("top", (d3.event.pageY - 28) + "px");
+                          // dashed line tooltips
+                          tooltips_dashed_y 
+                            .style("stroke", "white")
+                            .style("stroke-dasharray", "3,3")
+                            .style("opacity", 0.9)
+                            .attr("y1", yy(d.values['total']) )
+                            .attr("y2", height)
+                            .attr('x1', xx(format.parse(d3.format('')((+d.values['Calander'])))))
+                            .attr('x2', xx(format.parse(d3.format('')((+d.values['Calander'])))));
+                          tooltips_dashed_x
+                            .style("stroke", "white")
+                            .style("stroke-dasharray", "3,3")
+                            .style("opacity", 0.9)
+                            .attr("y1", yy(d.values['total']) )
+                            .attr("y2", yy(d.values['total']))
+                            .attr('x1', xx(format.parse(d3.format('')((+d.values['Calander'])))))
+                            .attr('x2',0);
+                       })
+                       .on("mouseout", function(d) {
+                         tooltip_chart.transition()
+                         .duration(500)
+                         .style("opacity", 0);
+                         tooltips_dashed_y.style("opacity", 0);
+                         tooltips_dashed_x.style("opacity", 0);
+                       });
+          // Add the X Axis
+          svg.append("g")
+              .attr("class", "x axis")
+              .attr("transform", "translate(0," + height + ")")
+              .call(xAxis)
+              .style('fill', 'white');
+          // Add the Y Axis
+          svg.append("g")
+              .attr("class", "y axis")
+              .call(yAxis)
+              .style('fill', 'white');
+          // add the axis labels
+          svg.append("text")
+             .attr("class", "x axis")
+             .attr("text-anchor", "end")
+             .attr("x", width/2)
+             .attr("y", height+ 30)
+             .style('fill', 'orange')
+             .text("Year")
+             .style("font", 14);
+          svg.append("text")
+             .attr("class", "y axis")
+             .attr("text-anchor", "end")
+             .attr("x", -200)
+             .attr("y", -70)
+             .attr("dy", ".75em")
+             .attr("transform", "rotate(-90)")
+             .style('fill', 'orange')
+             .text("Number of asylum seekers(log scale)");
+                  // funtion to update the scatter plot based on the dropDown menu
+        function update_trend_chart(country_selected){
+          var filtered=nested_trend.filter(function (d) { 
+            return d['key'] === country_selected
+          }); 
+          var others=nested_trend.filter(function (d) { 
+            return d['key'] !== country_selected
+          });
+          svg.selectAll('circle').data(others).remove();
+          svg.selectAll('line').data(others).remove();
+          d3.select("h3")
+            .html('Trend by Country '+ "<br/>"+ '(' + country_selected +')') // updates the title
+          // Define the line
+          var valueline = d3.svg.line()
+                          .x(function(d) { return (X_line[i]); })
+                          .y(function(d) { return (Y_line[i]); });
+          var X_line = [];
+          var Y_line = [];
+          var Y_scale_update = [];
+          // to chnge the y-scale
+          for(var i = 0; i < filtered[0].values.length; i += 1) {
+            Y_scale_update.push((filtered[0].values[i].values['total']));                                   
+          }
+          yy.domain([0,d3.extent(Y_scale_update)[1]]) // change the y-domain
+          for(var i = 0; i < filtered[0].values.length; i += 1) {
+            Y_line.push(yy(filtered[0].values[i].values['total']));
+            X_line.push(xx(format.parse(d3.format('')((+filtered[0].values[i].values['Calander'])))));                                                          
+          }
+          svg.select(".y.axis")
+             .transition().duration(500).ease("sin-in-out")  // https://github.com/mbostock/d3/wiki/Transitions#wiki-d3_ease
+             .call(yAxis);
+           // Add the valueline path.
+          for(var i = 0; i < filtered[0].values.length-1; i += 1) {
+            svg.append("line")
+               .attr("x1", X_line[i])
+               .attr("x2", X_line[i+1])
+               .attr("y1", Y_line[i])
+               .attr("y2", Y_line[i+1])
+               .attr( 'stroke', 'white')
+               .attr('stroke-width','5')
+               .style("opacity", 0.4);
+          }
+          var sel3=svg.selectAll('g')
+                      .data(filtered)
+          var tooltips_dashed_y = svg.append("g")
+                                     .append("line");
+          var tooltips_dashed_x = svg.append("g")
+                                     .append("line");
+          var sel4=sel3.selectAll('g')
+                       .data(function(d){
+                         return d.values;
+                      })
+                       .enter()
+                       .append('circle').attr('class','dot')
+                       .attr('r', 5)
+                       .attr('cx',function(d) { 
+                         return xx(format.parse(d3.format('')((+d.values['Calander']))));
+                       })
+                       .attr('cy', function(d) {
+                          return yy(d.values['total'] );
+                       })
+                       .attr( 'stroke', 'lightblue')
+                       .attr('stroke-width','2')
+                       .on("mouseover", function(d) {
+                          tooltip_chart.transition()
+                            .duration(200)
+                            .style("opacity", 0.9);
+                          tooltip_chart.html( d.values['Calander']  + ", " + "<br/> "+ d.values['total'] )
+                            .style("left", (d3.event.pageX - 5) + "px")
+                            .style("top", (d3.event.pageY + 28) + "px");
+                          tooltips_dashed_y 
+                            .style("stroke", "white")
+                            .style("stroke-dasharray", "3,3")
+                            .style("opacity", 0.9)
+                            .attr("y1", yy(d.values['total']) )
+                            .attr("y2", height)
+                            .attr('x1', xx(format.parse(d3.format('')((+d.values['Calander'])))))
+                            .attr('x2', xx(format.parse(d3.format('')((+d.values['Calander'])))));
+                          tooltips_dashed_x
+                            .style("stroke", "white")
+                            .style("stroke-dasharray", "3,3")
+                            .style("opacity", 0.9)
+                            .attr("y1", yy(d.values['total']) )
+                            .attr("y2", yy(d.values['total']))
+                            .attr('x1', xx(format.parse(d3.format('')((+d.values['Calander'])))))
+                            .attr('x2',0);
+                       })
+                       .on("mouseout", function(d) {
+                         tooltip_chart.transition()
+                          .duration(500)
+                          .style("opacity", 0);
+                         tooltips_dashed_y.style("opacity", 0);
+                         tooltips_dashed_x.style("opacity", 0);
+                       });
+                 }
+              };
+        var year_idx = 0;
+        var year_interval = setInterval(function() {
+          draw_circle(years[year_idx]);
+          year_idx++;
+          if(year_idx >= years.length) {
+            clearInterval(year_interval);
+            // once the animation over each year is done, run the total number of refugees
+            // total_no_refugee();
+            // creat buttons for selecting the year of interest
+            var source=['Source'];
+            var Source_buttons=d3.select('body')
+                                 .append('div')
+                                 .attr('class','Source_button')
+                                 .selectAll('div')
+                                 .data(source)
+                                 .enter()
+                                 .append('div')
+                                 .html('<a href= "http://popstats.unhcr.org/en/asylum_seekers" target="_blank">' + source +"</a>")
+                                 .style("color","green");
+            var info=['Info'];
+            var info_buttons=d3.select('body')
+                               .append('div')
+                               .attr('class','info_button')
+                               .selectAll('div')
+                               .data(info)
+                               .enter()
+                               .append('div')
+                               .text('info')
+                               .style("color","white")
+                               .on("click", function(d) {   
+                                  div_info.transition()    
+                                  .duration(200)    
+                                  .style("opacity", 0.9) ;
+                                  div_info .html( 'BACKGROUND'+ "<br/>"+ "<br/>"+ 'Eritrea is a country in the horn of Africa (represented by a red color on the map). It has been the source of a steady flow of refugees for the last 15 years. ' + "<br/>"+ 'The map shows those countries where Eritreans have applied for asylum. On the bottom half is a chart showing the trend in each country.' + "<br/>"+"<br/>"+'INTERACTIVITY'+ "<br/>"+ "<br/>"+ ' Use the year buttons on the left to investigate each year stats.' + "<br/>"+ 'Hovering your mouse on the country of interest will give you the exact number of Eritrean asylum seekers.'+ "<br/>"+ ' In the chart, you can Choose a coutry of interest to investigate the trend over the last 14 years.'
+                                  )           
+                                    .style("left", (d3.event.pageX-450) + "px")   
+                                    .style("top", (d3.event.pageY ) + "px")
+                                })          
+                                .on("mouseout", function(d) {   
+                                  div_info.transition()    
+                                  .duration(500)    
+                                  .style("opacity", 0); 
+                                }); 
+           var buttons=d3.select('body')
+                         .append('div')
+                         .attr('class','years_buttons')
+                         .selectAll('div')
+                         .data(years)
+                         .enter()
+                         .append('div')
+                         .text(function (d) {return d;});
+              buttons
+                .on('click',function(d){
+                  d3.select('.years_buttons')
+                  .selectAll('div')
+                  .transition()
+                  .duration(500)
+                  .style('color','black')
+                  .style('background','orange')
+                  d3.select(this)
+                    .transition()            
+                    .duration(500)
+                    .style('background','lightBlue')
+                    .style('color','white');
+              update(d);
+              })
+              trend_chart(); 
+          }
+        }, 1000);               
+        // Define the div for the tooltip
+        var div = d3.select("body").append("div") 
+                    .attr("class", "tooltip")       
+                    .style("opacity", 0);
+        // Define the div for the tooltip_info
+        var div_info = d3.select("body").append("div") 
+                         .attr("class", "tooltip_info")       
+                         .style("opacity", 0);                
+        }
+        var format = d3.time.format("%Y");
+        d3.csv("LATEST_DATA.csv", function(d) {
+          d['Applied during year'] = +d['Applied during year'];
+          d['Year_formated'] = (d['Year']);
+          d['Year'] = +d['Year'];
+          return d;
+        }, plot_points);
+      };
+      
+      </script>
+  </head>
+<body>
+  <script type="text/javascript">
+  /*
+    Use D3 to load the GeoJSON file
+    */
+    
+d3.json("world_countries.json", draw);
+// zoom and pan
+     
+  </script>
+</body>
+</html>
